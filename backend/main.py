@@ -1,14 +1,18 @@
-from fastapi import FastAPI, Depends
+import json
+from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine, Base
 from models import LocationData
-from schemas import LocationCreate, RiskRequest, RiskResponse
-from risk_engine import calculate_risk
+from schemas import LocationCreate
+from risk_aggregator import process_realtime_context
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="AURA-X Sentinel Backend")
-
+app = FastAPI(title="AURA-X Sentinel Real-Time Backend")
 
 def get_db():
     db = SessionLocal()
@@ -18,78 +22,66 @@ def get_db():
         db.close()
 
 
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        print("New client connected.")
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        print("Client disconnected.")
+
+manager = ConnectionManager()
+
 @app.get("/")
 def root():
-    return {"message": "AURA-X backend is running"}
+    return {"message": "AURA-X Real-Time Backend is running"}
 
 
-@app.post("/location")
-def receive_location(data: LocationCreate, db: Session = Depends(get_db)):
-    location_entry = LocationData(
-        user_id=data.user_id,
-        latitude=data.latitude,
-        longitude=data.longitude,
-        timestamp=data.timestamp
-    )
-    db.add(location_entry)
-    db.commit()
-    db.refresh(location_entry)
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            payload = json.loads(data)
+            
+            # Extract data
+            user_id = payload.get("user_id", "unknown")
+            latitude = payload.get("latitude")
+            longitude = payload.get("longitude")
+            timestamp = payload.get("timestamp")
+            
+            # Store in DB purely for tracking the Digital Twin context
+            location_entry = LocationData(
+                user_id=user_id,
+                latitude=latitude,
+                longitude=longitude,
+                timestamp=timestamp
+            )
+            db.add(location_entry)
+            db.commit()
+            
+            # Trigger Continuous Intelligence Layer
+            risk_response = process_realtime_context(
+                latitude=latitude, 
+                longitude=longitude, 
+                timestamp=timestamp,
+                user_id=user_id,
+                db=db
+            )
+            
+            # Stream the intelligence back to the app in real-time
+            await websocket.send_text(json.dumps(risk_response))
 
-    return {
-        "status": "success",
-        "message": "Location stored successfully",
-        "data": {
-            "id": location_entry.id,
-            "user_id": location_entry.user_id,
-            "latitude": location_entry.latitude,
-            "longitude": location_entry.longitude,
-            "timestamp": location_entry.timestamp
-        }
-    }
-
-
-@app.get("/locations/{user_id}")
-def get_user_locations(user_id: str, db: Session = Depends(get_db)):
-    records = db.query(LocationData).filter(LocationData.user_id == user_id).all()
-
-    return {
-        "status": "success",
-        "count": len(records),
-        "locations": [
-            {
-                "id": r.id,
-                "latitude": r.latitude,
-                "longitude": r.longitude,
-                "timestamp": r.timestamp
-            }
-            for r in records
-        ]
-    }
-
-
-@app.post("/risk", response_model=RiskResponse)
-def get_risk(data: RiskRequest):
-    return calculate_risk(
-        latitude=data.latitude,
-        longitude=data.longitude,
-        timestamp=data.timestamp
-    )
-
-
-@app.post("/sos")
-def trigger_sos(data: LocationCreate):
-    print("🚨 SOS TRIGGERED 🚨")
-    print(f"User: {data.user_id}")
-    print(f"Location: {data.latitude}, {data.longitude}")
-    print(f"Time: {data.timestamp}")
-
-    return {
-        "status": "alert_sent",
-        "message": "SOS signal received successfully",
-        "data": {
-            "user_id": data.user_id,
-            "latitude": data.latitude,
-            "longitude": data.longitude,
-            "timestamp": data.timestamp
-        }
-    }
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        print(f"Error handling WebSocket: {e}")
+        if websocket in manager.active_connections:
+            manager.disconnect(websocket)

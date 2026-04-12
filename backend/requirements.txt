@@ -1,4 +1,7 @@
 fastapi
 uvicorn
+websockets
+groq
+python-dotenv
+scikit-learn
 sqlalchemy
-pydantic
