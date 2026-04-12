@@ -107,7 +107,7 @@ export default function App() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>AURA-X Sentinel</Text>
+      <Text style={styles.title}>Aegis AI</Text>
       <Text style={styles.subtitle}>Live Location Tracking</Text>
 
       <View style={styles.card}>

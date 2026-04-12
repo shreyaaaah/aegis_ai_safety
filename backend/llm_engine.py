@@ -23,7 +23,7 @@ def simulate_scenario(context: dict) -> dict:
         }
 
     prompt = f"""
-    You are AURA-X Sentinel, a proactive safety reasoning layer.
+    You are Aegis AI, a proactive safety reasoning layer.
     Analyze the situation and simulate what might happen next.
 
     Context:

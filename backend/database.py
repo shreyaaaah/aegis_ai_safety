@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = "sqlite:///./aura_x.db"
+DATABASE_URL = "sqlite:///./aegis.db"
 
 engine = create_engine(
     DATABASE_URL,

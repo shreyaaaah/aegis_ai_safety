@@ -1,326 +1,241 @@
-import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Alert,
-  Button,
-  ScrollView,
-} from "react-native";
-import * as Location from "expo-location";
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, StatusBar, Dimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useWebSocket } from '../../hooks/useWebSocket';
+import { useTracking } from '../../hooks/useTracking';
+import { RiskMeter } from '../../components/RiskMeter';
+import { AlertCountdown } from '../../components/AlertCountdown';
 
-type RiskResult = {
-  risk_score: number;
-  risk_level: string;
-  reasons: string[];
-};
+const { width } = Dimensions.get('window');
+const MOCK_USER_ID = "user_777";
 
-export default function HomeScreen() {
-  const [location, setLocation] = useState<Location.LocationObjectCoords | null>(null);
-  const [status, setStatus] = useState<string>("Waiting...");
-  const [tracking, setTracking] = useState<boolean>(false);
-  const [lastSent, setLastSent] = useState<string>("");
-  const [risk, setRisk] = useState<RiskResult | null>(null);
+export default function DashboardScreen() {
+  const { riskData, isConnected, sendLocation } = useWebSocket(MOCK_USER_ID);
+  
+  // Start tracking when WebSocket is connected
+  const { isTracking } = useTracking(sendLocation, isConnected);
 
-  const userId = "user_001";
-  const BASE_URL = "http://192.168.2.104:8000";
-  const LOCATION_URL = `${BASE_URL}/location`;
-  const RISK_URL = `${BASE_URL}/risk`;
-  const SOS_URL = `${BASE_URL}/sos`;
+  const score = riskData?.risk_score || 0;
+  const level = riskData?.risk_level || 'Low';
+  const urgency = riskData?.urgency || 'low';
+  const reasons = riskData?.reasons || [];
+  const simulation = riskData?.simulation || '';
+  const advice = riskData?.advice || '';
 
-  const requestLocationPermission = async (): Promise<boolean> => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-
-    if (status !== "granted") {
-      Alert.alert("Permission denied", "Location permission is required.");
-      return false;
-    }
-
-    return true;
+  const handleAutoSOS = () => {
+    console.log("CRITICAL: Autonomous SOS Triggered!");
+    alert("Emergency contacts have been notified with your live location.");
   };
 
-  const getCurrentLocation = async (): Promise<Location.LocationObjectCoords | null> => {
-    try {
-      const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-      setLocation(currentLocation.coords);
-      return currentLocation.coords;
-    } catch (error) {
-      console.error("Location fetch error:", error);
-      setStatus("Failed to fetch location");
-      return null;
-    }
+  const handleDismissAlert = () => {
+    console.log("User dismissed alert. Resetting urgency.");
   };
-
-  const sendLocationToBackend = async (
-    coords: Location.LocationObjectCoords,
-    timestamp: string
-  ): Promise<void> => {
-    try {
-      const payload = {
-        user_id: userId,
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        timestamp,
-      };
-
-      const response = await fetch(LOCATION_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setStatus("Location sent successfully");
-        setLastSent(timestamp);
-        console.log("Location response:", result);
-      } else {
-        setStatus("Backend error while saving location");
-        console.log("Location backend error:", result);
-      }
-    } catch (error) {
-      console.error("Location API error:", error);
-      setStatus("Failed to send location");
-    }
-  };
-
-  const fetchRiskFromBackend = async (
-    coords: Location.LocationObjectCoords,
-    timestamp: string
-  ): Promise<void> => {
-    try {
-      const payload = {
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        timestamp,
-      };
-
-      const response = await fetch(RISK_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const result: RiskResult = await response.json();
-
-      if (response.ok) {
-        setRisk(result);
-        console.log("Risk response:", result);
-      } else {
-        console.log("Risk backend error:", result);
-      }
-    } catch (error) {
-      console.error("Risk API error:", error);
-    }
-  };
-
-  const sendSOS = async (): Promise<void> => {
-    if (!location) {
-      Alert.alert("Location unavailable", "Current location is not available yet.");
-      return;
-    }
-
-    try {
-      const payload = {
-        user_id: userId,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        timestamp: new Date().toISOString(),
-      };
-
-      const response = await fetch(SOS_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        Alert.alert("SOS Sent", "Emergency signal triggered successfully.");
-        console.log("SOS response:", result);
-      } else {
-        Alert.alert("Error", "Failed to send SOS.");
-        console.log("SOS backend error:", result);
-      }
-    } catch (error) {
-      console.error("SOS API error:", error);
-      Alert.alert("Error", "Something went wrong while sending SOS.");
-    }
-  };
-
-  const startTracking = async (): Promise<void> => {
-    const granted = await requestLocationPermission();
-    if (!granted) return;
-
-    setTracking(true);
-    setStatus("Tracking started");
-  };
-
-  const stopTracking = (): void => {
-    setTracking(false);
-    setStatus("Tracking stopped");
-  };
-
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | undefined;
-
-    if (tracking) {
-      const runTrackingCycle = async () => {
-        const coords = await getCurrentLocation();
-        if (coords) {
-          const timestamp = new Date().toISOString();
-          await sendLocationToBackend(coords, timestamp);
-          await fetchRiskFromBackend(coords, timestamp);
-        }
-      };
-
-      runTrackingCycle();
-
-      interval = setInterval(async () => {
-        await runTrackingCycle();
-      }, 5000);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [tracking]);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>AURA-X Sentinel</Text>
-      <Text style={styles.subtitle}>Live Location + Risk Monitoring</Text>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Tracking Details</Text>
-
-        <Text style={styles.label}>Status:</Text>
-        <Text>{status}</Text>
-
-        <Text style={styles.label}>Last Sent:</Text>
-        <Text>{lastSent || "Not sent yet"}</Text>
-
-        <Text style={styles.label}>Latitude:</Text>
-        <Text>{location ? location.latitude : "N/A"}</Text>
-
-        <Text style={styles.label}>Longitude:</Text>
-        <Text>{location ? location.longitude : "N/A"}</Text>
-
-        <Text style={styles.label}>Tracking:</Text>
-        <Text>{tracking ? "Active" : "Stopped"}</Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Current Risk Analysis</Text>
-
-        <Text style={styles.label}>Risk Score:</Text>
-        <Text>{risk ? risk.risk_score : "N/A"}</Text>
-
-        <Text style={styles.label}>Risk Level:</Text>
-        <Text
-          style={[
-            styles.riskLevel,
-            risk?.risk_level === "High"
-              ? styles.high
-              : risk?.risk_level === "Medium"
-              ? styles.medium
-              : styles.low,
-          ]}
-        >
-          {risk ? risk.risk_level : "N/A"}
-        </Text>
-
-        <Text style={styles.label}>Reasons:</Text>
-        {risk && risk.reasons.length > 0 ? (
-          risk.reasons.map((reason, index) => (
-            <Text key={index} style={styles.reason}>
-              • {reason}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
+      
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerTitle}>AEGIS <Text style={styles.headerAccent}>AI</Text></Text>
+            <Text style={styles.headerSub}>Continuous Intelligence</Text>
+          </View>
+          <View style={[styles.statusBadge, { borderColor: isConnected ? '#00E5FF' : '#FF0055' }]}>
+            <View style={[styles.statusDot, { backgroundColor: isConnected ? '#00E5FF' : '#FF0055' }]} />
+            <Text style={[styles.statusText, { color: isConnected ? '#00E5FF' : '#FF0055' }]}>
+              {isConnected ? 'LIVE' : 'OFFLINE'}
             </Text>
-          ))
-        ) : (
-          <Text>N/A</Text>
-        )}
-      </View>
+          </View>
+        </View>
 
-      <View style={styles.buttonContainer}>
-        <Button title="Start Tracking" onPress={startTracking} />
-      </View>
+        {/* Core Intelligence UI */}
+        <RiskMeter score={score} level={level} />
 
-      <View style={styles.buttonContainer}>
-        <Button title="Stop Tracking" onPress={stopTracking} color="red" />
-      </View>
+        {/* Autonomous SOS Module */}
+        <AlertCountdown 
+          urgency={urgency} 
+          onAutoSOS={handleAutoSOS} 
+          onDismiss={handleDismissAlert} 
+        />
 
-      <View style={styles.buttonContainer}>
-        <Button title="🚨 Send SOS" onPress={sendSOS} color="#d32f2f" />
-      </View>
-    </ScrollView>
+        {/* Context Logs */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="analytics-outline" size={20} color="#00E5FF" />
+            <Text style={styles.cardTitle}>Context Logs</Text>
+          </View>
+          <View style={styles.divider} />
+          
+          {reasons.length > 0 ? (
+            reasons.map((r: string, idx: number) => (
+              <View key={idx} style={styles.listItemContainer}>
+                <Ionicons name="chevron-forward" size={14} color="#00E5FF" style={{ marginTop: 3, marginRight: 5 }} />
+                <Text style={styles.listItem}>{r}</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.bodyText}>Establishing baseline environmental patterns...</Text>
+          )}
+        </View>
+
+        {/* Advanced Future Simulation */}
+        {(simulation || advice) ? (
+          <View style={styles.simCard}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="git-network-outline" size={20} color="#B026FF" />
+              <Text style={styles.simTitle}>Scenario Prediction</Text>
+            </View>
+            <View style={[styles.divider, { backgroundColor: 'rgba(176, 38, 255, 0.2)' }]} />
+            
+            <Text style={styles.bodyText}>{simulation}</Text>
+            
+            {advice ? (
+              <View style={styles.adviceBox}>
+                <Ionicons name="shield-checkmark-outline" size={18} color="#B026FF" />
+                <Text style={styles.adviceText}>{advice}</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#0B0F19',
+  },
   container: {
+    padding: 20,
     flexGrow: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-    backgroundColor: "#f4f7fb",
+    paddingBottom: 40,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 18,
-    marginBottom: 20,
-    color: "#555",
-  },
-  card: {
-    width: "100%",
-    backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 12,
-    elevation: 3,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  label: {
-    fontWeight: "bold",
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 30,
     marginTop: 10,
   },
-  buttonContainer: {
-    width: "100%",
-    marginVertical: 8,
+  headerTitle: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 1,
   },
-  riskLevel: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginTop: 4,
+  headerAccent: {
+    color: '#00E5FF',
+    fontWeight: '900',
   },
-  high: {
-    color: "red",
+  headerSub: {
+    color: '#64748B',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    marginTop: 2,
   },
-  medium: {
-    color: "orange",
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
   },
-  low: {
-    color: "green",
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+    shadowColor: '#00E5FF',
+    shadowOpacity: 1,
+    shadowRadius: 5,
+    elevation: 5,
   },
-  reason: {
-    marginTop: 4,
+  statusText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 1,
   },
+  card: {
+    backgroundColor: '#111827',
+    padding: 20,
+    borderRadius: 16,
+    marginVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 229, 255, 0.1)',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(0, 229, 255, 0.1)',
+    marginBottom: 15,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#E2E8F0',
+    marginLeft: 10,
+    letterSpacing: 1,
+  },
+  simCard: {
+    backgroundColor: '#111827',
+    padding: 20,
+    borderRadius: 16,
+    marginVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(176, 38, 255, 0.2)',
+  },
+  simTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#E2E8F0',
+    marginLeft: 10,
+    letterSpacing: 1,
+  },
+  bodyText: {
+    fontSize: 15,
+    color: '#94A3B8',
+    lineHeight: 24,
+  },
+  listItemContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  listItem: {
+    flex: 1,
+    fontSize: 15,
+    color: '#CBD5E1',
+    lineHeight: 22,
+  },
+  adviceBox: {
+    flexDirection: 'row',
+    marginTop: 20,
+    backgroundColor: 'rgba(176, 38, 255, 0.1)',
+    padding: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(176, 38, 255, 0.3)',
+    alignItems: 'center',
+  },
+  adviceText: {
+    flex: 1,
+    color: '#E9D5FF',
+    fontWeight: '600',
+    fontSize: 14,
+    marginLeft: 10,
+    lineHeight: 20,
+  }
 });

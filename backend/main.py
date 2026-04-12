@@ -12,7 +12,7 @@ load_dotenv()
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="AURA-X Sentinel Real-Time Backend")
+app = FastAPI(title="Aegis AI Real-Time Backend")
 
 def get_db():
     db = SessionLocal()
@@ -40,7 +40,7 @@ manager = ConnectionManager()
 
 @app.get("/")
 def root():
-    return {"message": "AURA-X Real-Time Backend is running"}
+    return {"message": "Aegis AI Real-Time Backend is running"}
 
 
 @app.websocket("/ws")
