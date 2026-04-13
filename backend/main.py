@@ -85,3 +85,7 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
         print(f"Error handling WebSocket: {e}")
         if websocket in manager.active_connections:
             manager.disconnect(websocket)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001)

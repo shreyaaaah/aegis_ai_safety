@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 
 // For local testing, ensure you use your machine's local IP address instead of localhost, 
 // e.g., 'ws://192.168.x.x:8000/ws' based on the backend.
-const WS_URL = 'ws://192.168.2.104:8000/ws';
+const WS_URL = 'ws://10.93.124.72:8001/ws';
 
 export function useWebSocket(userId: string) {
   const [riskData, setRiskData] = useState<any>(null);
