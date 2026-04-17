@@ -50,7 +50,7 @@ export default function ContactsScreen() {
 
   const deleteContact = async (id: number) => {
     try {
-      await fetch(`${BACKEND_URL}/contacts/${id}`, { method: 'DELETE' });
+      await fetch(`${CONFIG.BACKEND_URL}/contacts/${id}`, { method: 'DELETE' });
       fetchContacts();
     } catch (e) {
       console.error(e);
@@ -163,6 +163,9 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     fontSize: 12,
   },
+  list: {
+    flex: 1,
+  },
   contactCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -176,6 +179,23 @@ const styles = StyleSheet.create({
   primaryCard: {
     borderColor: 'rgba(0, 229, 255, 0.3)',
     backgroundColor: 'rgba(0, 229, 255, 0.05)',
+  },
+  contactInfo: {
+    flex: 1,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  contactName: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  contactSub: {
+    color: '#64748B',
+    fontSize: 13,
+    marginTop: 4,
   },
   primaryBadge: {
     backgroundColor: 'rgba(0, 229, 255, 0.1)',

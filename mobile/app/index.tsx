@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    backdropFilter: 'blur(20px)',
+    backdropFilter: 'none', // Removed for React Native compatibility
   },
   authTitle: {
     fontSize: 18,

@@ -11,8 +11,6 @@ const { width, height } = Dimensions.get('window');
 import MapView, { PROVIDER_GOOGLE, Marker, Polyline, Circle } from 'react-native-maps';
 import { useSafety } from '../../context/SafetyContext';
 
-const { width, height } = Dimensions.get('window');
-
 // Tactical Midnight HUD Map Style
 const DARK_MAP_STYLE = [
   { "elementType": "geometry", "stylers": [{ "color": "#121212" }] },
@@ -173,6 +171,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 1,
     opacity: 0.7,
+  },
+  radarPing: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#00E5FF',
+    shadowColor: '#00E5FF',
+    shadowOpacity: 1,
+    shadowRadius: 5,
   },
   threatBadge: {
     flexDirection: 'row',
