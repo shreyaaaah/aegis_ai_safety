@@ -68,7 +68,7 @@ export default function LoginScreen() {
               </LinearGradient>
             </View>
             <Text style={styles.brandTitle}>AEGIS<Text style={{color: '#00E5FF'}}>AI</Text></Text>
-            <Text style={styles.brandTagline}>NEURAL SENTINEL PROTOCOL</Text>
+            <Text style={styles.brandTagline}>NEURAL AEGIS PROTOCOL</Text>
           </View>
 
           {/* GlassAuth Card */}
