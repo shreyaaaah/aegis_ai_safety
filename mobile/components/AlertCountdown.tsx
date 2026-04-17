@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 interface AlertCountdownProps {
   urgency: string;
@@ -21,6 +22,8 @@ export const AlertCountdown: React.FC<AlertCountdownProps> = ({ urgency, onAutoS
 
     const timer = setInterval(() => {
       setTimeLeft(prev => prev - 1);
+      // Sharp haptic pulse every second
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     }, 1000);
 
     return () => clearInterval(timer);

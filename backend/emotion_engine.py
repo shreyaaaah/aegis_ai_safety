@@ -8,10 +8,23 @@ from llm_engine import get_groq_client
 
 def transcribe_audio(file_path: str) -> str:
     """
-    Mock audio transcription. 
-    In production: return whisper_model.transcribe(file_path)["text"]
+    Real-time audio transcription using Groq's Whisper API.
     """
-    return "I am walking home now, but someone is following me."
+    client = get_groq_client()
+    if not client:
+        return "Transcription unavailable: Groq API key missing."
+    
+    try:
+        with open(file_path, "rb") as file:
+            transcription = client.audio.transcriptions.create(
+                file=(os.path.basename(file_path), file.read()),
+                model="distil-whisper-large-v3-en",
+                response_format="text",
+            )
+            return transcription
+    except Exception as e:
+        print(f"Transcription Error: {e}")
+        return "Failed to transcribe audio signal."
 
 def analyze_emotion(text: str) -> dict:
     """

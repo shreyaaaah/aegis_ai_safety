@@ -42,8 +42,16 @@ def simulate_multi_agent_outcome(user_context: dict) -> dict:
       "agent_1_assessment": "<One sentence on user state>",
       "agent_2_assessment": "<One sentence on threat probability>",
       "final_predicted_outcome": "<One sentence summarizing what will likely happen>",
-      "risk_probability_percentage": <int 0-100>
+      "risk_probability_percentage": <int 0-100>,
+      "ghost_path": [
+        {{"lat": <lat1>, "lon": <lon1>}},
+        {{"lat": <lat2>, "lon": <lon2>}},
+        {{"lat": <lat3>, "lon": <lon3>}},
+        {{"lat": <lat4>, "lon": <lon4>}},
+        {{"lat": <lat5>, "lon": <lon5>}}
+      ]
     }}
+    Note: ghost_path points should be within 0.005 degrees of the user's location, showing a logical threat trajectory.
     """
 
     try:

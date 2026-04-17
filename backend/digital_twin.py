@@ -2,11 +2,15 @@ import numpy as np
 from sklearn.ensemble import IsolationForest
 import math
 
+from sqlalchemy.orm import Session
+from models import LocationData
+import datetime
+
 class BehavioralDigitalTwin:
     def __init__(self, user_id):
         self.user_id = user_id
-        # We use an Isolation Forest to detect anomalies in location/speed/time mappings
-        # In a real app we would load a pre-trained model per user from the DB
+        # Calibration sensitivity optimized for Phase 4
+        self.CALIBRATION_THRESHOLD = 15
         self.model = IsolationForest(n_estimators=100, contamination=0.1, random_state=42)
         self.is_trained = False
         self.history = []
@@ -35,8 +39,8 @@ class BehavioralDigitalTwin:
         Train the digital twin on historical data for this user.
         history_records should be a sorted list of dicts: [{'lat': x, 'lon': y, 'timestamp': dt}]
         """
-        if len(history_records) < 10:
-            return # Need more data to form a baseline
+        if len(history_records) < self.CALIBRATION_THRESHOLD:
+            return 
             
         features = []
         for i in range(1, len(history_records)):
@@ -70,7 +74,20 @@ class BehavioralDigitalTwin:
 # Singleton manager mapping user_id -> DigitalTwin
 twins: dict[str, BehavioralDigitalTwin] = {}
 
-def get_digital_twin(user_id: str) -> BehavioralDigitalTwin:
+def get_digital_twin(user_id: str, db: Session = None) -> BehavioralDigitalTwin:
     if user_id not in twins:
-        twins[user_id] = BehavioralDigitalTwin(user_id)
+        twin = BehavioralDigitalTwin(user_id)
+        
+        # Phase 4 Persistent Baseline Re-Construction
+        if db:
+            history_rows = db.query(LocationData).filter(LocationData.user_id == user_id).order_by(LocationData.timestamp.asc()).all()
+            if history_rows:
+                records = [
+                    {'lat': h.latitude, 'lon': h.longitude, 'timestamp': datetime.datetime.fromisoformat(h.timestamp.replace("Z", ""))} 
+                    for h in history_rows
+                ]
+                twin.ingest_data(records)
+        
+        twins[user_id] = twin
+        
     return twins[user_id]

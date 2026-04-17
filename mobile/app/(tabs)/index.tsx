@@ -1,19 +1,26 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, StatusBar, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useWebSocket } from '../../hooks/useWebSocket';
-import { useTracking } from '../../hooks/useTracking';
+import { useSafety } from '../../context/SafetyContext';
+import { useVoiceInterface } from '../../hooks/useVoiceInterface';
 import { RiskMeter } from '../../components/RiskMeter';
 import { AlertCountdown } from '../../components/AlertCountdown';
+import { RecordingComponent } from '../../components/RecordingComponent';
+import { SystemMonitor } from '../../components/SystemMonitor';
+import { useState, useEffect } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
-const MOCK_USER_ID = "user_777";
 
 export default function DashboardScreen() {
-  const { riskData, isConnected, sendLocation } = useWebSocket(MOCK_USER_ID);
-  
-  // Start tracking when WebSocket is connected
-  const { isTracking } = useTracking(sendLocation, isConnected);
+  const { riskData, isConnected, triggerSOS, isVoiceEnabled, setVoiceEnabled, isTracking } = useSafety();
+  const [packetCount, setPacketCount] = useState(0);
+
+  useEffect(() => {
+    if (riskData) {
+      setPacketCount(prev => prev + 1);
+    }
+  }, [riskData]);
 
   const score = riskData?.risk_score || 0;
   const level = riskData?.risk_level || 'Low';
@@ -22,13 +29,24 @@ export default function DashboardScreen() {
   const simulation = riskData?.simulation || '';
   const advice = riskData?.advice || '';
 
+  // Initialize Voice Interface (Optional AI Advisor)
+  useVoiceInterface(advice, isVoiceEnabled, score);
+
+  const [acousticResults, setAcousticResults] = useState<any>(null);
+  const [isCalibrating, setIsCalibrating] = useState(false);
+
   const handleAutoSOS = () => {
-    console.log("CRITICAL: Autonomous SOS Triggered!");
-    alert("Emergency contacts have been notified with your live location.");
+    console.log("CRITICAL: Autonomous Tactical Escalation Triggered!");
+    triggerSOS(score);
   };
 
   const handleDismissAlert = () => {
     console.log("User dismissed alert. Resetting urgency.");
+  };
+
+  const handleAudioAnalysis = (data: any) => {
+    setAcousticResults(data);
+    // You could also trigger a risk score update here by sending a flag to the backend
   };
 
   return (
@@ -37,22 +55,56 @@ export default function DashboardScreen() {
       
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         
-        {/* Header */}
+        {/* Modern Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>AEGIS <Text style={styles.headerAccent}>AI</Text></Text>
-            <Text style={styles.headerSub}>Continuous Intelligence</Text>
+            <Text style={styles.headerTitle}>AEGIS<Text style={{color: '#00E5FF'}}>AI</Text></Text>
+            <Text style={styles.headerSub}>MISSION INTEL: ACTIVE</Text>
           </View>
-          <View style={[styles.statusBadge, { borderColor: isConnected ? '#00E5FF' : '#FF0055' }]}>
-            <View style={[styles.statusDot, { backgroundColor: isConnected ? '#00E5FF' : '#FF0055' }]} />
-            <Text style={[styles.statusText, { color: isConnected ? '#00E5FF' : '#FF0055' }]}>
-              {isConnected ? 'LIVE' : 'OFFLINE'}
-            </Text>
-          </View>
+          
+          <TouchableOpacity 
+            onPress={() => setVoiceEnabled(!isVoiceEnabled)}
+            style={[styles.voiceToggle, isVoiceEnabled && styles.voiceActive]}
+          >
+             <Ionicons name={isVoiceEnabled ? "volume-high" : "volume-mute"} size={16} color={isVoiceEnabled ? '#05070A' : '#64748B'} />
+          </TouchableOpacity>
         </View>
+
+        {/* Real-Time Diagnostics */}
+        <SystemMonitor isTracking={isTracking} isConnected={isConnected} packetCount={packetCount} />
+
+        {/* Tactical Status Card */}
+        <TouchableOpacity 
+          style={[styles.calibrationCard, isCalibrating && styles.calibrationActive]} 
+          onPress={() => setIsCalibrating(!isCalibrating)}
+        >
+          <View style={styles.cardHeader}>
+            <Ionicons name="git-branch-outline" size={18} color={isCalibrating ? "#0B0F19" : "#00E5FF"} />
+            <Text style={[styles.cardTitle, isCalibrating && {color: '#0B0F19'}]}>CALIBRATION: {isCalibrating ? "ON" : "OFF"}</Text>
+          </View>
+        </TouchableOpacity>
 
         {/* Core Intelligence UI */}
         <RiskMeter score={score} level={level} />
+
+        {/* Acoustic Intelligence Scanner */}
+        <RecordingComponent onAnalysisComplete={handleAudioAnalysis} />
+
+        {/* Acoustic Results Display */}
+        {acousticResults && (
+          <View style={[styles.card, { borderColor: acousticResults.distress_score > 0.6 ? '#FF0055' : 'rgba(0, 229, 255, 0.2)' }]}>
+             <View style={styles.cardHeader}>
+              <Ionicons name="mic-outline" size={20} color={acousticResults.distress_score > 0.6 ? '#FF0055' : '#00E5FF'} />
+              <Text style={styles.cardTitle}>Acoustic Intel</Text>
+            </View>
+            <View style={styles.divider} />
+            <Text style={styles.bodyText}><Text style={{color: '#00E5FF'}}>Transcribed: </Text>"{acousticResults.text}"</Text>
+            <Text style={[styles.bodyText, {marginTop: 10}]}>
+              <Text style={{color: '#00E5FF'}}>Status: </Text>
+              {acousticResults.classification.toUpperCase()} ({Math.round(acousticResults.distress_score * 100)}% Stress)
+            </Text>
+          </View>
+        )}
 
         {/* Autonomous SOS Module */}
         <AlertCountdown 
@@ -124,45 +176,36 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '900',
     color: '#FFFFFF',
-    letterSpacing: 1,
-  },
-  headerAccent: {
-    color: '#00E5FF',
-    fontWeight: '900',
+    letterSpacing: 2,
   },
   headerSub: {
-    color: '#64748B',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    marginTop: 2,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
-    shadowColor: '#00E5FF',
-    shadowOpacity: 1,
-    shadowRadius: 5,
-    elevation: 5,
-  },
-  statusText: {
+    color: '#00E5FF',
     fontSize: 10,
     fontWeight: 'bold',
-    letterSpacing: 1,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    marginTop: 4,
+    opacity: 0.6,
+  },
+  voiceToggle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  voiceActive: {
+    backgroundColor: '#00E5FF',
+    borderColor: '#0097A7',
+    shadowColor: '#00E5FF',
+    shadowRadius: 10,
+    shadowOpacity: 0.5,
   },
   card: {
     backgroundColor: '#111827',
@@ -171,6 +214,18 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     borderWidth: 1,
     borderColor: 'rgba(0, 229, 255, 0.1)',
+  },
+  calibrationCard: {
+    backgroundColor: 'rgba(0, 229, 255, 0.05)',
+    padding: 20,
+    borderRadius: 16,
+    marginVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 229, 255, 0.2)',
+  },
+  calibrationActive: {
+    backgroundColor: '#00E5FF',
+    borderColor: '#00E5FF',
   },
   cardHeader: {
     flexDirection: 'row',

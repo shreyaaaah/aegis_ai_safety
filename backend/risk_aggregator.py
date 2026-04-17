@@ -1,6 +1,8 @@
 from datetime import datetime
 from digital_twin import get_digital_twin
 from llm_engine import simulate_scenario
+from multi_agent_sim import simulate_multi_agent_outcome
+from heatmap_engine import get_nearby_heatmap
 from models import LocationData
 
 def process_realtime_context(latitude: float, longitude: float, timestamp: str, user_id: str, db):
@@ -21,7 +23,7 @@ def process_realtime_context(latitude: float, longitude: float, timestamp: str, 
         time_str = "Unknown"
 
     # 2. Digital Twin Anomaly Signal
-    twin = get_digital_twin(user_id)
+    twin = get_digital_twin(user_id, db=db)
     history = db.query(LocationData).filter(LocationData.user_id == user_id).order_by(LocationData.timestamp.desc()).limit(2).all()
     
     speed_kmh = 0
@@ -67,20 +69,30 @@ def process_realtime_context(latitude: float, longitude: float, timestamp: str, 
     elif score >= 60: level = "High"
     elif score >= 30: level = "Medium"
 
-    # 5. LLM Scenario Trigger (Rate limited in production, here simply driven by threshold)
+    # 5. LLM Scenario & Multi-Agent Trigger
     simulation_output = {}
+    adversarial_sim = {}
+    
     if score >= 40:
         context = {
             "user_id": user_id,
+            "lat": latitude,
+            "lon": longitude,
             "is_anomaly": is_anomaly,
             "speed_kmh": speed_kmh,
             "hour": hour,
-            "risk_score": score
+            "risk_score": score,
+            "emotion_score": emotion_score
         }
+        
+        # Branch 1: Single-Agent Future Prediction
         simulation_output = simulate_scenario(context)
         
-        # If the LLM deems it immediate, elevate risk to critical instantly.
-        if simulation_output.get("urgency") == "immediate":
+        # Branch 2: Multi-Agent Adversarial Simulation
+        adversarial_sim = simulate_multi_agent_outcome(context)
+        
+        # If the LLM or Simulation deems it immediate, elevate risk.
+        if simulation_output.get("urgency") == "immediate" or adversarial_sim.get("risk_probability_percentage", 0) > 80:
             score = max(score, 85)
             level = "Critical"
 
@@ -91,5 +103,13 @@ def process_realtime_context(latitude: float, longitude: float, timestamp: str, 
         "digital_twin_anomaly": is_anomaly,
         "simulation": simulation_output.get("future_simulation", ""),
         "advice": simulation_output.get("actionable_advice", ""),
-        "urgency": simulation_output.get("urgency", "low")
+        "urgency": simulation_output.get("urgency", "low"),
+        "multi_agent": {
+            "user_assessment": adversarial_sim.get("agent_1_assessment", ""),
+            "threat_assessment": adversarial_sim.get("agent_2_assessment", ""),
+            "outcome": adversarial_sim.get("final_predicted_outcome", ""),
+            "threat_probability": adversarial_sim.get("risk_probability_percentage", 0),
+            "ghost_path": adversarial_sim.get("ghost_path", [])
+        },
+        "heatmap": get_nearby_heatmap(latitude, longitude)
     }
