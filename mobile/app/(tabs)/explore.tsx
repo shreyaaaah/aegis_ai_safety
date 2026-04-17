@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { CONFIG } from '../../constants/Config';
 
-const BACKEND_URL = "http://10.35.135.183:8001";
 const MOCK_USER_ID = "user_777";
 
 export default function ContactsScreen() {
@@ -17,7 +17,7 @@ export default function ContactsScreen() {
 
   const fetchContacts = async () => {
     try {
-      const resp = await fetch(`${BACKEND_URL}/contacts?user_id=${MOCK_USER_ID}`);
+      const resp = await fetch(`${CONFIG.BACKEND_URL}/contacts?user_id=${MOCK_USER_ID}`);
       const data = await resp.json();
       setContacts(data);
     } catch (e) {
@@ -28,7 +28,7 @@ export default function ContactsScreen() {
   const addContact = async () => {
     if (!name || !phone) return;
     try {
-      await fetch(`${BACKEND_URL}/contacts`, {
+      await fetch(`${CONFIG.BACKEND_URL}/contacts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
-
-const BACKEND_URL = 'http://10.35.135.183:8001/analyze-audio';
+import { CONFIG } from '../constants/Config';
 
 export function RecordingComponent({ onAnalysisComplete }: { onAnalysisComplete: (data: any) => void }) {
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
@@ -60,7 +59,7 @@ export function RecordingComponent({ onAnalysisComplete }: { onAnalysisComplete:
     });
 
     try {
-      const response = await fetch(BACKEND_URL, {
+      const response = await fetch(`${CONFIG.BACKEND_URL}/analyze-audio`, {
         method: 'POST',
         body: formData,
         headers: {

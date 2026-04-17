@@ -1,8 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-
-// For local testing, ensure you use your machine's local IP address instead of localhost, 
-// e.g., 'ws://192.168.x.x:8000/ws' based on the backend.
-const WS_URL = 'ws://10.35.135.183:8001/ws';
+import { CONFIG } from '../constants/Config';
 
 export function useWebSocket(userId: string) {
   const [riskData, setRiskData] = useState<any>(null);
@@ -11,7 +8,7 @@ export function useWebSocket(userId: string) {
 
   useEffect(() => {
     const connect = () => {
-      wsRef.current = new WebSocket(WS_URL);
+      wsRef.current = new WebSocket(CONFIG.WS_URL);
 
       wsRef.current.onopen = () => {
         setIsConnected(true);

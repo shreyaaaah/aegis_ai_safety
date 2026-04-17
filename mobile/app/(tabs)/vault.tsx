@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { CONFIG } from '../../constants/Config';
 
-const BACKEND_URL = "http://10.35.135.183:8001";
 const MOCK_USER_ID = "user_777";
 
 export default function VaultScreen() {
@@ -11,7 +11,7 @@ export default function VaultScreen() {
 
   const fetchIncidents = async () => {
     try {
-      const resp = await fetch(`${BACKEND_URL}/incidents?user_id=${MOCK_USER_ID}`);
+      const resp = await fetch(`${CONFIG.BACKEND_URL}/incidents?user_id=${MOCK_USER_ID}`);
       const data = await resp.json();
       setIncidents(data.sort((a: any, b: any) => b.id - a.id));
     } catch (e) {
