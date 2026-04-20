@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from digital_twin import get_digital_twin
 from llm_engine import simulate_scenario
 from multi_agent_sim import simulate_multi_agent_outcome
 from heatmap_engine import get_nearby_heatmap
-from models import LocationData
+from models import LocationData, EmotionData
 
 def process_realtime_context(latitude: float, longitude: float, timestamp: str, user_id: str, db):
     """
@@ -35,9 +35,20 @@ def process_realtime_context(latitude: float, longitude: float, timestamp: str, 
     anomaly_prediction = twin.detect_anomaly(latitude, longitude, speed_kmh, hour)
     is_anomaly = (anomaly_prediction == -1)
     
-    # 3. Emotion Signal (Placeholder until emotion_engine.py is integrated)
-    # emotion_score = get_emotion_stress_level(user_id)
-    emotion_score = 0.0 
+    # 3. Emotion Signal (Synchronously fetches latest cached signal)
+    emotion_score = 0.0
+    latest_emotion = db.query(EmotionData).filter(
+        EmotionData.user_id == user_id
+    ).order_by(EmotionData.id.desc()).first()
+
+    if latest_emotion:
+        # Only use if signal is fresh (e.g., within last 5 minutes)
+        try:
+            signal_time = datetime.fromisoformat(latest_emotion.timestamp)
+            if datetime.now() - signal_time < timedelta(minutes=5):
+                emotion_score = latest_emotion.distress_score
+        except Exception:
+            pass
 
     # 4. Weighted Fusion for Final Risk Score
     score = 0

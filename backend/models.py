@@ -29,3 +29,12 @@ class IncidentLog(Base):
     risk_score = Column(Integer)
     description = Column(String)
     response_type = Column(String)
+
+class EmotionData(Base):
+    __tablename__ = "emotion_signals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True)
+    distress_score = Column(Float)
+    classification = Column(String)
+    timestamp = Column(String)

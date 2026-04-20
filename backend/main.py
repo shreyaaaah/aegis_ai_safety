@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from database import SessionLocal, engine, Base
 import json
 import os
-from models import LocationData, EmergencyContact, IncidentLog
+from models import LocationData, EmergencyContact, IncidentLog, EmotionData
 from schemas import LocationCreate
 from risk_aggregator import process_realtime_context
 from emotion_engine import transcribe_audio, analyze_emotion
@@ -41,9 +41,9 @@ AUDIO_TEMP_DIR = Path("temp_audio")
 AUDIO_TEMP_DIR.mkdir(exist_ok=True)
 
 @app.post("/analyze-audio")
-async def analyze_audio_endpoint(file: UploadFile = File(...)):
+async def analyze_audio_endpoint(user_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
     """
-    Receives an audio file, transcribes it, and analyzes stress levels.
+    Receives an audio file, transcribes it, saves to DB, and analyzes stress levels.
     """
     file_path = AUDIO_TEMP_DIR / file.filename
     try:
@@ -55,11 +55,23 @@ async def analyze_audio_endpoint(file: UploadFile = File(...)):
         
         # 2. Analyze Emotion
         analysis = analyze_emotion(text)
+        distress_score = analysis.get("distress_score", 0.0)
+        classification = analysis.get("classification", "neutral")
+
+        # 3. Save Signal
+        emotion_entry = EmotionData(
+            user_id=user_id,
+            distress_score=distress_score,
+            classification=classification,
+            timestamp=datetime.datetime.now().isoformat()
+        )
+        db.add(emotion_entry)
+        db.commit()
         
         return {
             "text": text,
-            "distress_score": analysis.get("distress_score", 0),
-            "classification": analysis.get("classification", "neutral"),
+            "distress_score": distress_score,
+            "classification": classification,
             "reasoning": analysis.get("reasoning", "")
         }
     finally:
