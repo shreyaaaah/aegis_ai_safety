@@ -1,5 +1,7 @@
 # 🛡️ Aegis AI: Neural Safety Protocol
 
+**Live API Deployment:** [https://aegis-ai-safety-1.onrender.com](https://aegis-ai-safety-1.onrender.com)
+
 Aegis AI is a production-grade, real-time safety intelligence system designed to provide proactive threat detection and autonomous emergency response. By fusing behavioral modeling, emotional context awareness, and multi-agent scenario simulations, Aegis AI transforms traditional reactive safety into proactive digital defense.
 
 ## 🧠 AI Core Architecture
